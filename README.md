@@ -1,7 +1,7 @@
 # EngineX
 
 An http server with planned POSIX threads support for concurrency.
-This is a school project.
+This is a school project. Still a WIP.
 
 ## Installation
 
