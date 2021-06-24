@@ -1,6 +1,15 @@
-#ifndef HTTP_SERVER_H
-#define HTTP_SERVER_H
+/*
+ * new_http_server.h
+ *
+ *  Created on: Jun 19, 2021
+ *      Author: eray
+ */
 
-int http_server();
+#ifndef HTTP_SERVER_H_
+#define HTTP_SERVER_H_
 
-#endif
+void create_server();
+
+
+
+#endif /* HTTP_SERVER_H_ */

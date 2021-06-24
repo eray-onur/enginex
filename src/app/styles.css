@@ -1,0 +1,10 @@
+body {
+	background-color: darkslategray;
+}
+h1, h2, h3, h4, p {
+	color: beige;
+}
+
+a {
+	color: lightblue;
+}

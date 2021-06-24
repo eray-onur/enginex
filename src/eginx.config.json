@@ -1,0 +1,6 @@
+{
+	"domain": "localhost",
+	"port": 5531,
+	"root_directory": "/home/eray/apps",
+	"misc": true
+}
