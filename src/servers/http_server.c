@@ -48,6 +48,7 @@ void * create_server()
 	int fd_server, fd_client;
 	char buffer[2048];
 	int fd_img;
+	int fd_script;
 	int on = 1;
 
 	fd_server = socket(AF_INET, SOCK_STREAM, 0);
@@ -163,6 +164,12 @@ void * create_server()
 					sendfile(fd_client, fd_img, NULL, 8192);
 					close(fd_img);
 				}
+				else if(strstr(dp_root, "./app/script.js"))
+				{
+					fd_script = open("./app/script.js", O_RDONLY);
+					sendfile(fd_client, fd_script, NULL, 8192);
+					close(fd_img);
+								}
 				else if(strstr(dp_root, "./app/icon.png"))
 				{
 					fd_img = open("./app/icon.png", O_RDONLY);
@@ -265,7 +272,7 @@ void * create_server()
 	return NULL;
 }
 
-void handle_request()
+void handle_request_standalone()
 {
 	int fd_client, fd_server, fd_img;
 	char buffer[2048];
