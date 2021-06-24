@@ -17,6 +17,15 @@
 #include <fcntl.h>
 #include "../managers/app_manager.h"
 
+struct RequestInfo {
+	int* fd_client;
+	int* fd_server;
+	int* fd_img;
+	char buffer[2048];
+	struct sockaddr* client_addr;
+	socklen_t sin_len;
+};
+
 char header[] =
 "HTTP/1.1 200 OK\r\n"
 		"Content-Type: text/html; charset=UTF-8;\r\n\r\n";
@@ -30,28 +39,32 @@ char txt_header[] =
 		"Content-Type: text/plain;charset=UTF-8;\r\n\r\n";
 
 char* find_route_from_request(char* request_buffer);
+void handle_request();
 
-void create_server()
+void * create_server()
 {
 	struct sockaddr_in server_addr, client_addr;
-		socklen_t sin_len = sizeof(client_addr);
-		int fd_server, fd_client;
-		char buffer[2048];
-		int fd_img;
-		int on = 1;
+	socklen_t sin_len = sizeof(client_addr);
+	int fd_server, fd_client;
+	char buffer[2048];
+	int fd_img;
+	int on = 1;
 
-		fd_server = socket(AF_INET, SOCK_STREAM, 0);
-		if(fd_server < 0)
+	fd_server = socket(AF_INET, SOCK_STREAM, 0);
+	if(fd_server < 0)
 		{
 			perror("Server failed to initialize.");
 			exit(1);
 		}
 		setsockopt(fd_server, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int));
 
-		// Initializing server address information.
+		// Initializing server address information such as port number and family.
 		server_addr.sin_family = AF_INET;
 		server_addr.sin_addr.s_addr = INADDR_ANY;
-		server_addr.sin_port = htons(8080);
+
+		uint16_t port = (rand() % (8800 + 1 - 8000)) + 8000;
+		printf("App hosted on port: %d.\n", port);
+		server_addr.sin_port = htons(port);
 
 		// Binding server information to specified socket.
 		if(bind(fd_server, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1)
@@ -61,6 +74,7 @@ void create_server()
 			exit(1);
 		}
 
+		// Listening to socket for any incoming requests.
 		if(listen(fd_server, 10) == -1)
 		{
 			perror("Listen error.");
@@ -68,6 +82,8 @@ void create_server()
 			exit(1);
 		}
 
+
+		// Event loop that manages the listening process.
 		while(1)
 		{
 			fd_client = accept(fd_server, (struct sockaddr*) &client_addr, &sin_len);
@@ -246,9 +262,192 @@ void create_server()
 			// Parent process is killed.
 			close(fd_client);
 		}
-
+	return NULL;
 }
 
+void handle_request()
+{
+	int fd_client, fd_server, fd_img;
+	char buffer[2048];
+	struct sockaddr_in client_addr;
+	socklen_t sin_len = sizeof(client_addr);
+	while(1)
+	{
+		fd_client = accept(fd_server, (struct sockaddr*) &client_addr, &sin_len);
+		if(fd_client == -1)
+		{
+			perror("Connection failed...");
+			continue;
+		}
+		printf("Got client connection... \n");
+
+		if(!fork())
+		{
+			// Child process is killed.
+			close(fd_server);
+			memset(buffer, 0, 2048);
+			read(fd_client, buffer, 2047);
+
+			// Extract route information from the request.
+			char* route_buffer = find_route_from_request(buffer);
+			char dp_root[60] = "./app";
+			strcat(dp_root, route_buffer);
+			/* Favicon Check */
+
+			if(strstr(dp_root, "./app/index.html"))
+			{
+				printf("HTML request.\n");
+				// Send the requested page to client.
+				char text[50000];
+				fetch_file_content("./app/index.html", text, 50000);
+				printf("Response content: %s\n", text);
+				if(text == NULL)
+				{
+					perror("file not found");
+					exit(EXIT_FAILURE);
+				}
+
+				char *concat = calloc((strlen(header) + 1 + strlen(text) + 1), sizeof(char));
+				if (concat == NULL)
+				{
+					perror("Calloc");
+					exit(EXIT_FAILURE);
+				}
+				strncat(concat, header, strlen(header));
+				strncat(concat, text, strlen(text));
+
+				write(fd_client, concat, strlen(concat) - 1);
+				free(concat);
+			}
+			else if(strstr(dp_root, "./app/dashboard.html"))
+			{
+				printf("HTML request.\n");
+				// Send the requested page to client.
+				char text[50000];
+				fetch_file_content("./app/dashboard.html", text, 50000);
+				printf("Response content: \n%s\n", text);
+				if(text == NULL)
+				{
+					perror("file not found");
+					exit(EXIT_FAILURE);
+				}
+
+				char *concat = calloc((strlen(header) + 1 + strlen(text) + 1), sizeof(char));
+				if (concat == NULL)
+				{
+					perror("Calloc");
+					exit(EXIT_FAILURE);
+				}
+				strncat(concat, header, strlen(header));
+				strncat(concat, text, strlen(text));
+
+				write(fd_client, concat, strlen(concat) - 1);
+				free(concat);
+			}
+			else if(strstr(dp_root, "./app/styles.css"))
+			{
+				fd_img = open("./app/styles.css", O_RDONLY);
+				sendfile(fd_client, fd_img, NULL, 8192);
+				close(fd_img);
+			}
+			else if(strstr(dp_root, "./app/icon.png"))
+			{
+				fd_img = open("./app/icon.png", O_RDONLY);
+				sendfile(fd_client, fd_img, NULL, 8192);
+				close(fd_img);
+			}
+			else if(strstr(dp_root, "./app/data.txt"))
+			{
+				printf("Plain text request.\n");
+				char text[50000];
+				fetch_file_content("./app/data.txt", text, 50000);
+				printf("Response content: %s\n", text);
+				if(text == NULL)
+				{
+					perror("Text file not found.");
+					exit(EXIT_FAILURE);
+				}
+
+				char *response = calloc((strlen(txt_header) + 1 + strlen(text) + 1), sizeof(char));
+				if (response == NULL)
+				{
+					perror("Calloc");
+					exit(EXIT_FAILURE);
+				}
+				strncat(response, txt_header, strlen(txt_header));
+				strncat(response, text, strlen(text));
+
+				write(fd_client, response, strlen(response) - 1);
+			}
+			else if(strstr(dp_root, "./app/data.json"))
+			{
+				printf("JSON text Request.\n");
+				char text[50000];
+				fetch_file_content("./app/data.json", text, 50000);
+
+				FILE *config = fopen("./app/data.json", "r");
+				char configBuffer[512];
+				fread(configBuffer, 512, 1, config);
+				fclose(config);
+
+				printf("Response content: %s\n", configBuffer);
+				if(text == NULL)
+				{
+					perror("JSON file not found.");
+					exit(EXIT_FAILURE);
+				}
+
+				char *response = calloc((strlen(json_header) + 1 + strlen(configBuffer) + 1), sizeof(char));
+				if (response == NULL)
+				{
+					perror("Calloc");
+					exit(EXIT_FAILURE);
+				}
+				strncat(response, json_header, strlen(json_header));
+				strncat(response, configBuffer, strlen(configBuffer));
+
+				printf("RESPONSE: \n%s", configBuffer);
+
+				write(fd_client, configBuffer, strlen(configBuffer));
+			}
+			else
+			{
+				// Send the requested page to client.
+				char text[50000];
+				fetch_file_content("./error.html", text, 50000);
+				printf("Response content: %s\n", text);
+
+				if(text == NULL)
+				{
+					perror("file not found");
+					exit(EXIT_FAILURE);
+				}
+
+				char *response = calloc((strlen(header) + 1 + strlen(text) + 1), sizeof(char));
+				if (response == NULL)
+				{
+					perror("Calloc");
+					exit(EXIT_FAILURE);
+				}
+				strncat(response, header, strlen(header));
+				strncat(response, text, strlen(text));
+
+				write(fd_client, response, strlen(response) - 1);
+				free(response);
+
+			}
+			close(fd_client);
+
+			// Deallocate strings in order to prevent memory leaks.
+			//free(dp_root);
+			//free(buffer);
+			free(route_buffer);
+			exit(0);
+		}
+	}
+}
+
+// Parsing the request header for route information.
 char* find_route_from_request(char* request_buffer)
 {
 	size_t current_route_index = 0;
@@ -284,16 +483,6 @@ char* find_route_from_request(char* request_buffer)
 
 	}
 	return found_route;
-}
-
-char* parse_app_name(char* path)
-{
-	return NULL;
-}
-
-char* parse_file_name(char* path)
-{
-	return NULL;
 }
 
 
