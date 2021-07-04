@@ -26,22 +26,22 @@ int main(int argc, char *argv[])
 	// bind to a hardcoded port for any requests.
 
 	// Initialize and bind a unit of work to four threads.
-
-	pthread_t thmaster;
-	pthread_t sth1;
-	pthread_t sth2;
-	pthread_t sth3;
-
-	pthread_create(&thmaster, NULL, create_server, NULL);
-	pthread_create(&sth1, NULL, create_server, NULL);
-	pthread_create(&sth2, NULL, create_server, NULL);
-	pthread_create(&sth3, NULL, create_server, NULL);
-
-	// Wait for the executing threads to quit the application.
-	pthread_join(sth1, NULL);
-	pthread_join(sth2, NULL);
-	pthread_join(sth3, NULL);
-	pthread_join(thmaster, NULL);
+	create_server();
+//	pthread_t thmaster;
+//	pthread_t sth1;
+//	pthread_t sth2;
+//	pthread_t sth3;
+//
+//	pthread_create(&thmaster, NULL, create_server, NULL);
+//	pthread_create(&sth1, NULL, create_server, NULL);
+//	pthread_create(&sth2, NULL, create_server, NULL);
+//	pthread_create(&sth3, NULL, create_server, NULL);
+//
+//	// Wait for the executing threads to quit the application.
+//	pthread_join(sth1, NULL);
+//	pthread_join(sth2, NULL);
+//	pthread_join(sth3, NULL);
+//	pthread_join(thmaster, NULL);
 
 	exit(0);
 }
